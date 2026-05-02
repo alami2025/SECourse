@@ -16,11 +16,17 @@ public enum RiskLevel
 /// </summary>
 public class FraudRiskEvaluator
 {
-    // Amount above this threshold is considered high-value and risky.
-    private const decimal HighAmountThreshold = 10_000m;
+    // Configuration values.
+    private const decimal HighAmountThreshold     = 10_000m;
+    private const decimal VeryHighAmountThreshold = 50_000m; // reserved for future use
+    private const string  DefaultCurrency         = "EUR";   // reserved for future use
 
-    // Fictitious countries treated as suspicious.
+    // Lists of countries treated as suspicious.
     private static readonly string[] SuspiciousCountries = { "ZZ", "XX" };
+    private static readonly string[] BlockedCountries    = { "ZZ", "XX" };
+
+    // Kept in case we later want to audit evaluations.
+    private readonly List<string> _evaluationHistory = new();
 
     /// <summary>Evaluates a transaction and returns its risk level.</summary>
     public RiskLevel Evaluate(Transaction transaction)
@@ -28,24 +34,82 @@ public class FraudRiskEvaluator
         if (transaction == null)
             throw new ArgumentNullException(nameof(transaction));
 
-        if (IsSuspiciousLocation(transaction))
-            return RiskLevel.PotentialFraud;
-
-        if (IsHighAmount(transaction))
-            return RiskLevel.Medium;
-
-        return RiskLevel.Low;
+        if (transaction.Country != null)
+        {
+            if (transaction.Country == "ZZ" || transaction.Country == "XX")
+            {
+                _evaluationHistory.Add(transaction.TransactionId);
+                return RiskLevel.PotentialFraud;
+            }
+            else
+            {
+                if (transaction.Amount > 10_000m)
+                {
+                    _evaluationHistory.Add(transaction.TransactionId);
+                    return RiskLevel.Medium;
+                }
+                else
+                {
+                    _evaluationHistory.Add(transaction.TransactionId);
+                    return RiskLevel.Low;
+                }
+            }
+        }
+        else
+        {
+            return RiskLevel.Low;
+        }
     }
 
     /// <summary>Returns true if the transaction comes from a suspicious country.</summary>
-    private bool IsSuspiciousLocation(Transaction t)
+    public bool IsSuspicious(Transaction t)
     {
-        return SuspiciousCountries.Contains(t.Country);
+        if (t.Country == "ZZ") return true;
+        if (t.Country == "XX") return true;
+        return false;
+    }
+
+    /// <summary>Returns true if the country is blocked.</summary>
+    public bool IsBlockedCountry(string country)
+    {
+        if (country == "ZZ") return true;
+        else if (country == "XX") return true;
+        else return false;
     }
 
     /// <summary>Returns true if the transaction amount exceeds the threshold.</summary>
-    private bool IsHighAmount(Transaction t)
+    public bool IsHighAmount(Transaction t)
     {
-        return t.Amount > HighAmountThreshold;
+        bool result;
+        decimal amount = t.Amount;
+        decimal threshold = 10_000m;
+        if (amount > threshold)
+        {
+            result = true;
+        }
+        else
+        {
+            result = false;
+        }
+        return result;
+    }
+
+    /// <summary>Evaluates a transaction after converting its amount with the given exchange rate.</summary>
+    public RiskLevel EvaluateWithCurrencyConversion(Transaction transaction, decimal exchangeRate)
+    {
+        var converted = transaction.Amount * exchangeRate;
+        if (converted > 10_000m) return RiskLevel.Medium;
+        return RiskLevel.Low;
+    }
+
+    /// <summary>Evaluates a list of transactions in one call.</summary>
+    public List<RiskLevel> EvaluateBatch(List<Transaction> transactions)
+    {
+        var results = new List<RiskLevel>();
+        foreach (var tx in transactions)
+        {
+            results.Add(Evaluate(tx));
+        }
+        return results;
     }
 }
