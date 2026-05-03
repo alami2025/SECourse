@@ -5,12 +5,12 @@ namespace FraudMonitoring;
 /// </summary>
 public class Transaction
 {
-    public string TransactionId { get; set; } = "";
-    public string CardNumber    { get; set; } = "";
+    public string TransactionId { get; set; } = string.Empty;
+    public string CardNumber    { get; set; } = string.Empty;
     public decimal Amount       { get; set; }
-    public string Currency      { get; set; } = "";
-    public string MerchantId    { get; set; } = "";
-    public string Country       { get; set; } = "";
+    public string Currency      { get; set; } = string.Empty;
+    public string MerchantId    { get; set; } = string.Empty;
+    public string Country       { get; set; } = string.Empty;
     public DateTime Timestamp   { get; set; }
 }
 
@@ -23,11 +23,14 @@ public class TransactionReceiver
     // In-memory store of accepted transactions.
     private readonly List<Transaction> _store = new();
 
+    /// <summary>Read-only view of stored transactions, exposed for verification.</summary>
+    public IReadOnlyList<Transaction> Transactions => _store.AsReadOnly();
+
     /// <summary>Receives a transaction, validates it, then stores it.</summary>
     public void Receive(Transaction transaction)
     {
         Validate(transaction);
-        Store(transaction);
+        _store.Add(transaction);
     }
 
     /// <summary>Checks that all required fields are present and valid.</summary>
@@ -43,11 +46,5 @@ public class TransactionReceiver
             throw new ArgumentException("Amount must be positive.");
         if (string.IsNullOrWhiteSpace(t.Currency))
             throw new ArgumentException("Currency is required.");
-    }
-
-    /// <summary>Persists the transaction so it can be evaluated for fraud.</summary>
-    private void Store(Transaction t)
-    {
-        _store.Add(t);
     }
 }
